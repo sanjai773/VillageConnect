@@ -323,6 +323,12 @@ export default function AdminDashboard({
         }
       }
 
+      const isValidUUID = (str) => {
+        if (!str) return false;
+        const regex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        return regex.test(str);
+      };
+
       if (isSupabaseConfigured) {
         // Try inserting with 'image' column
         const newAnnouncementObj = {
@@ -332,7 +338,7 @@ export default function AdminDashboard({
           category: annCategory,
           pinned: annPinned,
           author: currentUser.name,
-          created_by: currentUser.id,
+          ...(isValidUUID(currentUser.id) ? { created_by: currentUser.id } : {}),
           image: imageUrl
         };
 
@@ -349,7 +355,7 @@ export default function AdminDashboard({
               category: annCategory,
               pinned: annPinned,
               author: currentUser.name,
-              created_by: currentUser.id
+              ...(isValidUUID(currentUser.id) ? { created_by: currentUser.id } : {})
             };
             const { error: fallbackError } = await supabase.from('announcements').insert(fallbackAnnouncementObj);
             if (fallbackError) throw fallbackError;
