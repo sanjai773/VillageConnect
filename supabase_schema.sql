@@ -267,6 +267,27 @@ CREATE POLICY "Allow public read chats" ON public.chats FOR SELECT USING (true);
 CREATE POLICY "Allow anyone to insert chats" ON public.chats FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow anyone to delete chats" ON public.chats FOR DELETE USING (true);
 
+-- 10. Village Directory Entries Table (for guest/resident profile registrations)
+CREATE TABLE public.village_directory (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  blood_group text,
+  address text NOT NULL,
+  phone text NOT NULL,
+  occupation text,
+  skills text[] DEFAULT '{}'::text[],
+  volunteer text[] DEFAULT '{}'::text[],
+  created_by text NOT NULL, -- guest ID or auth UUID
+  edit_permission text NOT NULL DEFAULT 'idle', -- 'idle', 'requested', 'granted'
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.village_directory ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read access to village_directory" ON public.village_directory FOR SELECT USING (true);
+CREATE POLICY "Allow public insert to village_directory" ON public.village_directory FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update to village_directory" ON public.village_directory FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete to village_directory" ON public.village_directory FOR DELETE USING (true);
+
 -- Enable replication for all required tables in one command
 alter publication supabase_realtime set table 
   public.chats,
@@ -275,4 +296,5 @@ alter publication supabase_realtime set table
   public.complaints,
   public.events,
   public.announcements,
-  public.profiles;
+  public.profiles,
+  public.village_directory;

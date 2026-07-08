@@ -91,7 +91,9 @@ export default function App() {
   };
 
   const handleSaveProfile = async (updatedDetails) => {
-    if (isSupabaseConfigured && sessionUser) {
+    const isGuest = sessionUser && sessionUser.id && sessionUser.id.startsWith('guest_');
+
+    if (isSupabaseConfigured && sessionUser && !isGuest) {
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -119,7 +121,7 @@ export default function App() {
       });
       addNotification('Success', 'Profile updated in database!', 'success');
     } else {
-      // Offline fallback
+      // Offline fallback / Guest profile update (saves in state / localStorage)
       const updatedUser = {
         ...currentUser,
         name: updatedDetails.name,
