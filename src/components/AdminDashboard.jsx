@@ -13,59 +13,13 @@ export default function AdminDashboard({
   complaints,
   addNotification,
   announcements = [],
-  setAnnouncements
+  setAnnouncements,
+  directoryEntries = [],
+  setDirectoryEntries
 }) {
   const isOfficer = currentUser?.role === 'officer';
   const defaultTab = !isOfficer && isSupabaseConfigured ? 'requests' : 'moderation';
   const [activeTab, setActiveTab] = useState(defaultTab);
-
-  // Custom directory entries (to review profile edit requests)
-  const [directoryEntries, setDirectoryEntries] = useState([]);
-
-  useEffect(() => {
-    const fetchEntries = async () => {
-      if (isSupabaseConfigured) {
-        try {
-          const { data, error } = await supabase
-            .from('village_directory')
-            .select('*')
-            .order('created_at', { ascending: false });
-          if (data) setDirectoryEntries(data);
-        } catch (e) {
-          console.error(e);
-        }
-      } else {
-        const saved = localStorage.getItem('vc_custom_directory');
-        if (saved) {
-          try {
-            setDirectoryEntries(JSON.parse(saved));
-          } catch (e) {}
-        }
-      }
-    };
-    fetchEntries();
-
-    if (isSupabaseConfigured) {
-      const sub = supabase
-        .channel('admin_dashboard_directory')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'village_directory' }, (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setDirectoryEntries(prev => {
-              if (prev.some(e => e.id === payload.new.id)) return prev;
-              return [payload.new, ...prev];
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            setDirectoryEntries(prev => prev.map(e => e.id === payload.new.id ? payload.new : e));
-          } else if (payload.eventType === 'DELETE') {
-            setDirectoryEntries(prev => prev.filter(e => e.id !== payload.old.id));
-          }
-        })
-        .subscribe();
-      return () => {
-        supabase.removeChannel(sub);
-      };
-    }
-  }, []);
 
   const handleAdminPermissionResponse = async (entry, status) => {
     if (isSupabaseConfigured) {

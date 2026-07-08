@@ -2,14 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Search, UserCheck, Shield, HelpCircle, MapPin, Mail, Phone, Tag, Plus, X } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../utils/supabaseClient';
 
-export default function VillageDirectory({ currentUser, users, addNotification }) {
+export default function VillageDirectory({ currentUser, users, addNotification, directoryEntries = [], setDirectoryEntries }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeArea, setActiveArea] = useState('All');
   const [bloodGroupSearch, setBloodGroupSearch] = useState('All');
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // Custom directory entries state (for guests/residents)
-  const [directoryEntries, setDirectoryEntries] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
   const [modalForm, setModalForm] = useState({
@@ -29,52 +27,6 @@ export default function VillageDirectory({ currentUser, users, addNotification }
   const suggestedGroups = availableGroups.filter(g => 
     g.toLowerCase().includes(bloodGroupSearch.toLowerCase())
   );
-
-  // Fetch village directory entries
-  useEffect(() => {
-    const fetchEntries = async () => {
-      if (isSupabaseConfigured) {
-        try {
-          const { data, error } = await supabase
-            .from('village_directory')
-            .select('*')
-            .order('created_at', { ascending: false });
-          if (data) setDirectoryEntries(data);
-        } catch (e) {
-          console.error('Error fetching village directory:', e);
-        }
-      } else {
-        const saved = localStorage.getItem('vc_custom_directory');
-        if (saved) {
-          try {
-            setDirectoryEntries(JSON.parse(saved));
-          } catch (e) {}
-        }
-      }
-    };
-    fetchEntries();
-
-    if (isSupabaseConfigured) {
-      const sub = supabase
-        .channel('directory_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'village_directory' }, (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setDirectoryEntries(prev => {
-              if (prev.some(e => e.id === payload.new.id)) return prev;
-              return [payload.new, ...prev];
-            });
-          } else if (payload.eventType === 'UPDATE') {
-            setDirectoryEntries(prev => prev.map(e => e.id === payload.new.id ? payload.new : e));
-          } else if (payload.eventType === 'DELETE') {
-            setDirectoryEntries(prev => prev.filter(e => e.id !== payload.old.id));
-          }
-        })
-        .subscribe();
-      return () => {
-        supabase.removeChannel(sub);
-      };
-    }
-  }, []);
 
   const handleSaveEntry = async (e) => {
     e.preventDefault();

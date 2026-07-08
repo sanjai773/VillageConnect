@@ -69,6 +69,7 @@ export default function App() {
   const [marketplaceItems, setMarketplaceItems] = useState(isSupabaseConfigured ? [] : MOCK_MARKETPLACE);
   const [chats, setChats] = useState(isSupabaseConfigured ? [] : MOCK_CHATS);
   const [reportedItems, setReportedItems] = useState([]);
+  const [directoryEntries, setDirectoryEntries] = useState([]);
   
   const [loadingDb, setLoadingDb] = useState(isSupabaseConfigured);
 
@@ -310,6 +311,10 @@ export default function App() {
         const { data: dbChats } = await supabase.from('chats').select('*').order('timestamp', { ascending: true });
         if (dbChats) setChats(dbChats);
 
+        // Village Directory Custom Entries
+        const { data: dbDirectory } = await supabase.from('village_directory').select('*').order('created_at', { ascending: false });
+        if (dbDirectory) setDirectoryEntries(dbDirectory);
+
       } catch (err) {
         console.error('Error loading database tables:', err);
       } finally {
@@ -318,6 +323,16 @@ export default function App() {
     };
 
     fetchInitialData();
+
+    // Fallback for offline custom directory
+    if (!isSupabaseConfigured) {
+      const saved = localStorage.getItem('vc_custom_directory');
+      if (saved) {
+        try {
+          setDirectoryEntries(JSON.parse(saved));
+        } catch (e) {}
+      }
+    }
 
     // 1. Subscribe to Announcements
     const announcementSub = supabase
@@ -471,6 +486,23 @@ export default function App() {
       })
       .subscribe();
 
+    // 9. Subscribe to Village Directory Custom Entries
+    const directorySub = supabase
+      .channel('directory_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'village_directory' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setDirectoryEntries(prev => {
+            if (prev.some(e => e.id === payload.new.id)) return prev;
+            return [payload.new, ...prev];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          setDirectoryEntries(prev => prev.map(e => e.id === payload.new.id ? payload.new : e));
+        } else if (payload.eventType === 'DELETE') {
+          setDirectoryEntries(prev => prev.filter(e => e.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(announcementSub);
       supabase.removeChannel(postSub);
@@ -480,6 +512,7 @@ export default function App() {
       supabase.removeChannel(marketSub);
       supabase.removeChannel(chatSub);
       supabase.removeChannel(profileSub);
+      supabase.removeChannel(directorySub);
     };
   }, [sessionUser?.id]);
 
@@ -700,6 +733,8 @@ export default function App() {
             currentUser={currentUser}
             users={users}
             addNotification={addNotification}
+            directoryEntries={directoryEntries}
+            setDirectoryEntries={setDirectoryEntries}
           />
         );
       case 'emergency':
@@ -727,6 +762,8 @@ export default function App() {
             addNotification={addNotification}
             announcements={announcements}
             setAnnouncements={setAnnouncements}
+            directoryEntries={directoryEntries}
+            setDirectoryEntries={setDirectoryEntries}
           />
         );
       default:
