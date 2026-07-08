@@ -431,12 +431,20 @@ export default function App() {
     // 7. Subscribe to Chats
     const chatSub = supabase
       .channel('chat_changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chats' }, (payload) => {
-        setChats(prev => {
-          const hasMsg = prev.some(m => m.id === payload.new.id);
-          if (hasMsg) return prev;
-          return [...prev, payload.new];
-        });
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chats' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setChats(prev => {
+            const hasMsg = prev.some(m => m.id === payload.new.id);
+            if (hasMsg) return prev;
+            // If it is a system settings message, replace the previous settings message
+            if (payload.new.sender_name === 'system_settings') {
+              return [...prev.filter(m => m.sender_name !== 'system_settings'), payload.new];
+            }
+            return [...prev, payload.new];
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setChats(prev => prev.filter(m => m.id !== payload.old.id));
+        }
       })
       .subscribe();
 
@@ -946,9 +954,9 @@ export default function App() {
                 </div>
               </>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '8px', fontSize: '0.85rem', color: 'var(--success)', fontWeight: 600 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginRight: '8px', fontSize: '0.85rem', color: 'var(--success)', fontWeight: 600 }}>
                 <ShieldCheck size={16} />
-                <span>Secure Live Database Connected</span>
+                <span className="desktop-db-status">Secure Live Database Connected</span>
               </div>
             )}
 
@@ -1051,6 +1059,7 @@ export default function App() {
           isSupabaseConfigured={isSupabaseConfigured}
           onSave={handleSaveProfile}
           lang={lang}
+          onLogout={handleLogout}
         />
       )}
 
@@ -1058,7 +1067,7 @@ export default function App() {
   );
 }
 
-function ProfileModal({ currentUser, onClose, isSupabaseConfigured, onSave, lang }) {
+function ProfileModal({ currentUser, onClose, isSupabaseConfigured, onSave, lang, onLogout }) {
   const [name, setName] = useState(currentUser.name || '');
   const [phone, setPhone] = useState(currentUser.phone || '');
   const [address, setAddress] = useState(currentUser.address || '');
@@ -1122,6 +1131,51 @@ function ProfileModal({ currentUser, onClose, isSupabaseConfigured, onSave, lang
         <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
           {lang === 'en' ? 'Complete your registration details below for the village directory and emergency logs.' : 'கிராம முகவரி புத்தகம் மற்றும் அவசர பதிவுகளுக்காக உங்கள் விவரங்களை பூர்த்தி செய்யவும்.'}
         </p>
+
+        {/* User Identity & Logout Button */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          backgroundColor: 'var(--primary-light)',
+          padding: '12px',
+          borderRadius: 'var(--radius-sm)',
+          marginBottom: '16px',
+          gap: '8px'
+        }}>
+          <div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>
+              {lang === 'en' ? 'Signed in as:' : 'உள்நுழைந்துள்ள பயனர்:'}
+            </span>
+            <strong style={{ fontSize: '0.95rem' }}>{currentUser.name}</strong>
+            {currentUser.email && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block' }}>({currentUser.email})</span>}
+          </div>
+          {onLogout && (
+            <button
+              type="button"
+              onClick={() => {
+                onLogout();
+                onClose();
+              }}
+              className="btn btn-outline"
+              style={{
+                borderColor: 'var(--danger)',
+                color: 'var(--danger)',
+                backgroundColor: 'rgba(231, 111, 81, 0.05)',
+                padding: '6px 12px',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                width: '100%',
+                cursor: 'pointer'
+              }}
+            >
+              <LogOut size={14} /> {lang === 'en' ? 'Logout Account' : 'வெளியேறவும்'}
+            </button>
+          )}
+        </div>
 
         {errorMsg && <div className="auth-error" style={{ marginBottom: '12px' }}>{errorMsg}</div>}
 

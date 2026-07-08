@@ -648,7 +648,7 @@ export default function EventsView({
       <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', width: '100%' }}>
         <div>
           <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.75rem', fontWeight: 700 }}>Village Events</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Stay informed about festivals, Gram Sabhas, sports meets, and camps.</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Stay informed</p>
         </div>
         {!showAddForm && (currentUser.role === 'admin' || currentUser.role === 'officer') && (
           <button className="btn btn-accent" onClick={() => setShowAddForm(true)}>

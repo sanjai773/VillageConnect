@@ -11,11 +11,36 @@ export default function RealTimeChat({
   const [activeChatId, setActiveChatId] = useState('village_square');
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [showAdminSettings, setShowAdminSettings] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // Parse chat settings from database or localstorage
+  const isFlatChats = Array.isArray(chats) && chats.length > 0 && typeof chats[0].sender_name !== 'undefined';
+  const settingsMsg = isFlatChats ? chats.find(msg => msg.sender_name === 'system_settings') : null;
+  
+  let chatSettings = { allow_residents: true, allow_officers: true, restricted_users: [] };
+  if (settingsMsg) {
+    try {
+      chatSettings = JSON.parse(settingsMsg.text);
+    } catch (e) {}
+  } else {
+    const saved = localStorage.getItem('vc_chat_settings');
+    if (saved) {
+      try {
+        chatSettings = JSON.parse(saved);
+      } catch (e) {}
+    }
+  }
+
+  const isUserRestricted = chatSettings.restricted_users.includes(currentUser.name);
+  const isRoleRestricted = 
+    (currentUser.role === 'resident' && !chatSettings.allow_residents) ||
+    (currentUser.role === 'officer' && !chatSettings.allow_officers);
+  const canChat = currentUser.role === 'admin' || (!isUserRestricted && !isRoleRestricted);
 
   // Build the active chat depending on offline/online mode
   let activeChat = null;
@@ -29,14 +54,16 @@ export default function RealTimeChat({
       partnerAvatar: '🌾',
       partnerRole: 'public square',
       status: 'online',
-      messages: chats.map(msg => ({
-        id: msg.id,
-        senderId: msg.sender_name === currentUser.name ? 'current' : msg.sender_name,
-        senderName: msg.sender_name,
-        senderRole: msg.sender_role,
-        text: msg.text,
-        timestamp: msg.timestamp
-      }))
+      messages: chats
+        .filter(msg => msg.sender_name !== 'system_settings')
+        .map(msg => ({
+          id: msg.id,
+          senderId: msg.sender_name === currentUser.name ? 'current' : msg.sender_name,
+          senderName: msg.sender_name,
+          senderRole: msg.sender_role,
+          text: msg.text,
+          timestamp: msg.timestamp
+        }))
     };
     chatList = [activeChat];
   } else {
@@ -130,10 +157,114 @@ export default function RealTimeChat({
     addNotification('File Attached', 'Mock image attached successfully.', 'info');
   };
 
+  const saveSettings = async (newSettings) => {
+    if (isSupabaseConfigured) {
+      try {
+        // Delete old settings if any
+        await supabase.from('chats').delete().eq('sender_name', 'system_settings');
+        // Insert new settings message
+        const { error } = await supabase.from('chats').insert({
+          sender_name: 'system_settings',
+          sender_role: 'system',
+          text: JSON.stringify(newSettings)
+        });
+        if (error) throw error;
+      } catch (err) {
+        console.error('Error saving chat settings:', err);
+      }
+    } else {
+      localStorage.setItem('vc_chat_settings', JSON.stringify(newSettings));
+      setChats(prev => [...prev.filter(m => m.sender_name !== 'system_settings'), {
+        id: `sys_${Date.now()}`,
+        sender_name: 'system_settings',
+        sender_role: 'system',
+        text: JSON.stringify(newSettings),
+        timestamp: new Date().toISOString()
+      }]);
+    }
+  };
+
+  const handleClearChat = async () => {
+    if (window.confirm('Are you sure you want to clear the entire chat history? This cannot be undone.')) {
+      if (isSupabaseConfigured) {
+        try {
+          const { error } = await supabase
+            .from('chats')
+            .delete()
+            .neq('sender_name', 'system_settings');
+          
+          if (error) throw error;
+          addNotification('Chat Cleared', 'All messages have been deleted by Admin.', 'success');
+        } catch (err) {
+          console.error('Error clearing chat:', err);
+          addNotification('Error', 'Failed to clear chat.', 'danger');
+        }
+      } else {
+        setChats(prev => prev.filter(m => m.sender_name === 'system_settings'));
+        addNotification('Chat Cleared', 'Local chat history cleared.', 'success');
+      }
+    }
+  };
+
+  const handleDeleteMessage = async (msgId) => {
+    if (window.confirm('Delete this message?')) {
+      if (isSupabaseConfigured) {
+        try {
+          const { error } = await supabase
+            .from('chats')
+            .delete()
+            .eq('id', msgId);
+          if (error) throw error;
+          addNotification('Success', 'Message deleted.', 'success');
+        } catch (err) {
+          console.error(err);
+        }
+      } else {
+        // Flat chats (online mock) or thread fallback
+        if (isFlatChats) {
+          setChats(prev => prev.filter(m => m.id !== msgId));
+        } else {
+          setChats(prev => prev.map(chat => {
+            if (chat.id !== activeChatId) return chat;
+            return {
+              ...chat,
+              messages: chat.messages.filter(m => m.id !== msgId)
+            };
+          }));
+        }
+        addNotification('Success', 'Message deleted.', 'success');
+      }
+    }
+  };
+
+  const handleToggleRestrictUser = (username) => {
+    const isRestricted = chatSettings.restricted_users.includes(username);
+    let updatedUsers = [];
+    if (isRestricted) {
+      updatedUsers = chatSettings.restricted_users.filter(u => u !== username);
+      addNotification('User Unrestricted', `${username} can now send messages.`, 'success');
+    } else {
+      updatedUsers = [...chatSettings.restricted_users, username];
+      addNotification('User Restricted', `${username} is blocked from sending messages.`, 'warning');
+    }
+    
+    saveSettings({
+      ...chatSettings,
+      restricted_users: updatedUsers
+    });
+  };
+
   const formatMessageTime = (isoString) => {
     const d = new Date(isoString);
     return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   };
+
+  let inputPlaceholder = "Post message in Village Square...";
+  if (isUserRestricted) {
+    inputPlaceholder = "🚫 Restricted by Admin from texting.";
+  } else if (isRoleRestricted) {
+    inputPlaceholder = "🚫 Chat disabled for your role by Admin.";
+  }
 
   return (
     <div className="chat-layout card" style={{ display: 'flex', height: '550px', padding: 0, overflow: 'hidden' }}>
@@ -185,7 +316,7 @@ export default function RealTimeChat({
       <div className="chat-pane">
         
         {/* Chat Partner Header */}
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-card)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div className="user-avatar" style={{ fontSize: '1.25rem', width: '32px', height: '32px' }}>
               {activeChat?.partnerAvatar}
@@ -197,7 +328,93 @@ export default function RealTimeChat({
               </span>
             </div>
           </div>
+          
+          {/* Admin Header Controls */}
+          {currentUser.role === 'admin' && (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                type="button"
+                className="role-btn"
+                onClick={() => setShowAdminSettings(prev => !prev)}
+                style={{ padding: '4px 8px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                ⚙️ Settings
+              </button>
+              <button 
+                type="button"
+                className="role-btn"
+                onClick={handleClearChat}
+                style={{ padding: '4px 8px', fontSize: '0.8rem', color: 'var(--danger)', borderColor: 'rgba(231,111,81,0.3)' }}
+              >
+                🗑️ Clear Chat
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Admin Settings Sub-Panel */}
+        {(currentUser.role === 'admin' && showAdminSettings) && (
+          <div style={{
+            padding: '12px 20px',
+            backgroundColor: 'var(--primary-light)',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            fontSize: '0.85rem'
+          }}>
+            <h5 style={{ fontWeight: 600, color: 'var(--primary)', marginBottom: '2px' }}>Panchayat Chat Controls (Admin)</h5>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 500 }}>
+                <input 
+                  type="checkbox" 
+                  checked={chatSettings.allow_residents} 
+                  onChange={(e) => saveSettings({ ...chatSettings, allow_residents: e.target.checked })}
+                />
+                Allow Residents to text
+              </label>
+              
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 500 }}>
+                <input 
+                  type="checkbox" 
+                  checked={chatSettings.allow_officers} 
+                  onChange={(e) => saveSettings({ ...chatSettings, allow_officers: e.target.checked })}
+                />
+                Allow Panchayat Officers to text
+              </label>
+            </div>
+
+            {chatSettings.restricted_users.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', marginTop: '4px' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Restricted:</span>
+                {chatSettings.restricted_users.map(username => (
+                  <span 
+                    key={username}
+                    style={{ 
+                      backgroundColor: 'rgba(231, 111, 81, 0.15)', 
+                      color: 'var(--danger)', 
+                      padding: '2px 8px', 
+                      borderRadius: '12px', 
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    {username}
+                    <button 
+                      type="button" 
+                      onClick={() => handleToggleRestrictUser(username)}
+                      style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontWeight: 'bold', padding: 0 }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Message History */}
         <div style={{ flexGrow: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -208,33 +425,81 @@ export default function RealTimeChat({
                 key={msg.id}
                 style={{
                   alignSelf: isMe ? 'flex-end' : 'flex-start',
-                  maxWidth: '70%',
+                  maxWidth: '75%',
                   display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: isMe ? 'flex-end' : 'flex-start'
+                  gap: '8px',
+                  alignItems: 'center',
+                  flexDirection: isMe ? 'row-reverse' : 'row'
                 }}
               >
-                {/* Display sender info if group chat */}
-                {(!isMe && isSupabaseConfigured) && (
-                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '2px', textTransform: 'capitalize' }}>
-                    {msg.senderName} ({msg.senderRole})
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                  {/* Display sender info if group chat / offline message */}
+                  {!isMe && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--primary)', textTransform: 'capitalize' }}>
+                        {msg.senderName} ({msg.senderRole})
+                      </span>
+                      
+                      {/* Admin restrict button */}
+                      {currentUser.role === 'admin' && msg.senderRole !== 'admin' && (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleRestrictUser(msg.senderName)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: chatSettings.restricted_users.includes(msg.senderName) ? 'var(--success)' : 'var(--danger)',
+                            fontSize: '0.65rem',
+                            cursor: 'pointer',
+                            padding: '0 4px',
+                            textDecoration: 'underline',
+                            fontWeight: 600
+                          }}
+                        >
+                          {chatSettings.restricted_users.includes(msg.senderName) ? 'Unrestrict' : 'Restrict'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div style={{
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    borderTopRightRadius: isMe ? '2px' : '12px',
+                    borderTopLeftRadius: isMe ? '12px' : '2px',
+                    backgroundColor: isMe ? 'var(--primary)' : 'var(--primary-light)',
+                    color: isMe ? 'var(--text-white)' : 'var(--text-main)',
+                    fontSize: '0.9rem',
+                    lineHeight: '1.4'
+                  }}>
+                    {msg.text}
+                  </div>
+                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    {formatMessageTime(msg.timestamp)} {isMe && <CheckCheck size={10} style={{ color: 'var(--success)' }} />}
                   </span>
-                )}
-                <div style={{
-                  padding: '10px 14px',
-                  borderRadius: '12px',
-                  borderTopRightRadius: isMe ? '2px' : '12px',
-                  borderTopLeftRadius: isMe ? '12px' : '2px',
-                  backgroundColor: isMe ? 'var(--primary)' : 'var(--primary-light)',
-                  color: isMe ? 'var(--text-white)' : 'var(--text-main)',
-                  fontSize: '0.9rem',
-                  lineHeight: '1.4'
-                }}>
-                  {msg.text}
                 </div>
-                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                  {formatMessageTime(msg.timestamp)} {isMe && <CheckCheck size={10} style={{ color: 'var(--success)' }} />}
-                </span>
+
+                {/* Delete message icon for Admin */}
+                {currentUser.role === 'admin' && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteMessage(msg.id)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      opacity: 0.5,
+                      transition: 'opacity 0.2s',
+                      padding: '4px',
+                      alignSelf: 'center'
+                    }}
+                    title="Delete Message"
+                  >
+                    🗑️
+                  </button>
+                )}
               </div>
             );
           })}
@@ -259,6 +524,7 @@ export default function RealTimeChat({
             onClick={handleAttachMedia}
             style={{ padding: '6px' }}
             title="Attach Mock Image"
+            disabled={!canChat}
           >
             <Paperclip size={18} />
           </button>
@@ -266,9 +532,10 @@ export default function RealTimeChat({
           <input
             type="text"
             className="form-input"
-            placeholder={isSupabaseConfigured ? "Post message in Village Square..." : "Type your message here..."}
+            placeholder={!canChat ? inputPlaceholder : (isSupabaseConfigured ? "Post message in Village Square..." : "Type your message here...")}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
+            disabled={!canChat}
             dir="ltr"
             autoComplete="off"
             autoCorrect="off"
@@ -283,6 +550,7 @@ export default function RealTimeChat({
                 className="role-btn" 
                 onClick={() => handleAddEmoji(emoji)}
                 style={{ padding: '4px 6px', fontSize: '0.9rem' }}
+                disabled={!canChat}
               >
                 {emoji}
               </button>
@@ -293,6 +561,7 @@ export default function RealTimeChat({
             type="submit" 
             className="btn btn-primary"
             style={{ padding: '8px 14px', borderRadius: '6px' }}
+            disabled={!canChat || !inputText.trim()}
           >
             <Send size={16} />
           </button>
