@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Heart, ThumbsUp, HelpCircle, MessageSquare, Send, Share2, Flag, Pin, AlertTriangle, Image as ImageIcon, X } from 'lucide-react';
+import { Heart, ThumbsUp, HelpCircle, MessageSquare, Send, Share2, Flag, Pin, AlertTriangle, Image as ImageIcon, X, Trash2 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../utils/supabaseClient';
 
 export default function FeedView({ 
@@ -16,6 +16,7 @@ export default function FeedView({
   const [commentInputs, setCommentInputs] = useState({});
   const [uploading, setUploading] = useState(false);
   const [activeSharePostId, setActiveSharePostId] = useState(null);
+  const [expandedComments, setExpandedComments] = useState({});
 
   // Custom Camera Modal state
   const [showCameraModal, setShowCameraModal] = useState(false);
@@ -279,6 +280,24 @@ export default function FeedView({
     }
   };
 
+  const handleDeletePost = async (postId) => {
+    if (window.confirm('Are you sure you want to delete this post?')) {
+      if (isSupabaseConfigured) {
+        try {
+          const { error } = await supabase.from('posts').delete().eq('id', postId);
+          if (error) throw error;
+          addNotification('Post Deleted', 'The post has been deleted.', 'warning');
+        } catch (err) {
+          console.error(err);
+          addNotification('Error', 'Failed to delete post from database.', 'danger');
+        }
+      } else {
+        setPosts(posts.filter(p => p.id !== postId));
+        addNotification('Post Deleted', 'The post has been deleted locally.', 'warning');
+      }
+    }
+  };
+
   const handleShareClick = (postId) => {
     setActiveSharePostId(prev => prev === postId ? null : postId);
   };
@@ -492,16 +511,28 @@ export default function FeedView({
                   </span>
                 </div>
               </div>
-              <button 
-                className="theme-toggle" 
-                title="Report Content"
-                onClick={() => {
-                  reportPost(post.id, 'post');
-                  addNotification('Reported', 'Post sent to moderation queue.', 'warning');
-                }}
-              >
-                <Flag size={16} />
-              </button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {(currentUser.role === 'admin' || currentUser.role === 'officer') && (
+                  <button 
+                    className="theme-toggle" 
+                    title="Delete Post"
+                    onClick={() => handleDeletePost(post.id)}
+                    style={{ color: 'var(--danger)' }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+                <button 
+                  className="theme-toggle" 
+                  title="Report Content"
+                  onClick={() => {
+                    reportPost(post.id, 'post');
+                    addNotification('Reported', 'Post sent to moderation queue.', 'warning');
+                  }}
+                >
+                  <Flag size={16} />
+                </button>
+              </div>
             </div>
 
             {/* Content */}
@@ -541,10 +572,13 @@ export default function FeedView({
                 <Heart size={16} style={{ fill: post.hasReacted === 'like' ? 'var(--danger)' : 'none', color: post.hasReacted === 'like' ? 'var(--danger)' : 'currentColor' }} /> Like ({post.reactions?.like || 0})
               </button>
               <button 
-                className="btn btn-outline"
+                className={`btn btn-outline ${expandedComments[post.id] ? 'active' : ''}`}
                 onClick={() => {
-                  const inputEl = document.getElementById(`comment-input-${post.id}`);
-                  inputEl?.focus();
+                  setExpandedComments(prev => ({ ...prev, [post.id]: !prev[post.id] }));
+                  setTimeout(() => {
+                    const inputEl = document.getElementById(`comment-input-${post.id}`);
+                    inputEl?.focus();
+                  }, 100);
                 }}
                 style={{ flexGrow: 1, border: 'none', padding: '6px', borderRadius: '4px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
@@ -646,51 +680,53 @@ export default function FeedView({
             </div>
 
             {/* Comments Thread */}
-            <div className="comments-section" style={{ backgroundColor: 'var(--primary-light)', padding: '12px', borderRadius: '8px' }}>
-              <h5 style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <MessageSquare size={12} /> Comments ({post.comments?.length || 0})
-              </h5>
-              
-              {post.comments?.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-                  {post.comments.map(c => (
-                    <div key={c.id} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '0.85rem', backgroundColor: 'var(--bg-card)', padding: '8px', borderRadius: '6px', border: '1px solid var(--border)' }}>
-                      <div className="user-avatar" style={{ fontSize: '0.9rem', width: '24px', height: '24px', flexShrink: 0 }}>👤</div>
-                      <div style={{ flexGrow: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                          <strong>{c.author}</strong>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{formatTime(c.time)}</span>
+            {expandedComments[post.id] && (
+              <div className="comments-section" style={{ backgroundColor: 'var(--primary-light)', padding: '12px', borderRadius: '8px', marginTop: '12px' }}>
+                <h5 style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <MessageSquare size={12} /> Comments ({post.comments?.length || 0})
+                </h5>
+                
+                {post.comments?.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                    {post.comments.map(c => (
+                      <div key={c.id} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '0.85rem', backgroundColor: 'var(--bg-card)', padding: '8px', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                        <div className="user-avatar" style={{ fontSize: '0.9rem', width: '24px', height: '24px', flexShrink: 0 }}>👤</div>
+                        <div style={{ flexGrow: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                            <strong>{c.author}</strong>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{formatTime(c.time)}</span>
+                          </div>
+                          <p style={{ color: 'var(--text-main)' }}>{c.text}</p>
                         </div>
-                        <p style={{ color: 'var(--text-main)' }}>{c.text}</p>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
 
-              {/* Add Comment Input */}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  id={`comment-input-${post.id}`}
-                  type="text"
-                  className="form-input"
-                  placeholder="Write a comment..."
-                  value={commentInputs[post.id] || ''}
-                  onChange={(e) => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
-                  style={{ fontSize: '0.85rem', padding: '6px 10px', borderRadius: '4px' }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleAddComment(post.id);
-                  }}
-                />
-                <button 
-                  className="btn btn-primary"
-                  onClick={() => handleAddComment(post.id)}
-                  style={{ padding: '6px 12px', borderRadius: '4px' }}
-                >
-                  <Send size={14} />
-                </button>
+                {/* Add Comment Input */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    id={`comment-input-${post.id}`}
+                    type="text"
+                    className="form-input"
+                    placeholder="Write a comment..."
+                    value={commentInputs[post.id] || ''}
+                    onChange={(e) => setCommentInputs({ ...commentInputs, [post.id]: e.target.value })}
+                    style={{ fontSize: '0.85rem', padding: '6px 10px', borderRadius: '4px' }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAddComment(post.id);
+                    }}
+                  />
+                  <button 
+                    className="btn btn-primary"
+                    onClick={() => handleAddComment(post.id)}
+                    style={{ padding: '6px 12px', borderRadius: '4px' }}
+                  >
+                    <Send size={14} />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ))}
       </div>
