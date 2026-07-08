@@ -346,7 +346,11 @@ export default function AdminDashboard({
 
         if (error) {
           // If column 'image' does not exist, fall back to appending it to content
-          if (error.message && error.message.includes('column "image" of relation "announcements" does not exist')) {
+          if (
+            error.code === 'PGRST204' ||
+            (error.message && error.message.includes("Could not find the 'image' column")) ||
+            (error.message && error.message.includes('column "image" of relation "announcements" does not exist'))
+          ) {
             console.warn('Image column does not exist on announcements table. Appending image URL to content as fallback.');
             const fallbackAnnouncementObj = {
               title: annTitle,
