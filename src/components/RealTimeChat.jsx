@@ -194,6 +194,7 @@ export default function RealTimeChat({
             .neq('sender_name', 'system_settings');
           
           if (error) throw error;
+          setChats(prev => prev.filter(m => m.sender_name === 'system_settings'));
           addNotification('Chat Cleared', 'All messages have been deleted by Admin.', 'success');
         } catch (err) {
           console.error('Error clearing chat:', err);
@@ -215,6 +216,8 @@ export default function RealTimeChat({
             .delete()
             .eq('id', msgId);
           if (error) throw error;
+          
+          setChats(prev => prev.filter(m => m.id !== msgId));
           addNotification('Success', 'Message deleted.', 'success');
         } catch (err) {
           console.error(err);

@@ -265,6 +265,7 @@ CREATE TABLE public.chats (
 ALTER TABLE public.chats ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow public read chats" ON public.chats FOR SELECT USING (true);
 CREATE POLICY "Allow anyone to insert chats" ON public.chats FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow anyone to delete chats" ON public.chats FOR DELETE USING (true);
 
 -- Enable replication for all required tables in one command
 alter publication supabase_realtime set table 
