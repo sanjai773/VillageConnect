@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Sanjai. All rights reserved.
+
 import React, { useState } from 'react';
 import { Phone, ShieldCheck, AlertOctagon } from 'lucide-react';
 import { EMERGENCY_CONTACTS } from '../utils/MockData';

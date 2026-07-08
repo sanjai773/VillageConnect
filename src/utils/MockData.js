@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Sanjai. All rights reserved.
+
 // MockData.js
 // Pre-populated data for VillageConnect community platform
 

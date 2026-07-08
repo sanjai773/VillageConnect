@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Sanjai. All rights reserved.
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Heart, ThumbsUp, HelpCircle, MessageSquare, Send, Share2, Flag, Pin, AlertTriangle, Image as ImageIcon, X, Trash2 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../utils/supabaseClient';

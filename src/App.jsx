@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Sanjai. All rights reserved.
+
 import React, { useState, useEffect } from 'react';
 import { 
   Newspaper, 

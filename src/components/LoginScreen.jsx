@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Sanjai. All rights reserved.
+
 import React, { useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../utils/supabaseClient';
 import { Lock, Mail, User, Phone, MapPin, CheckCircle, Shield, ArrowRight } from 'lucide-react';

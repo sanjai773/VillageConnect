@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Sanjai. All rights reserved.
+
 import React, { useState, useRef, useEffect } from 'react';
 import { AlertCircle, Clock, CheckCircle2, Star, MapPin, Camera, AlertTriangle, ShieldCheck, ChevronRight, X } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../utils/supabaseClient';

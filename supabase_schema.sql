@@ -1,3 +1,5 @@
+-- Copyright (c) 2026 Sanjai. All rights reserved.
+
 -- ==========================================
 -- VillageConnect Supabase Database Schema
 -- Run this script in the Supabase SQL Editor

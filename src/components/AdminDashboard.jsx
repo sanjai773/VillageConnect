@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Sanjai. All rights reserved.
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Shield, Users, AlertTriangle, Settings, BarChart2, Check, Trash2, ToggleLeft, ToggleRight, UserCheck, UserX, ShieldCheck, Pin, Plus } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../utils/supabaseClient';

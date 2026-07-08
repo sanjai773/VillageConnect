@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Sanjai. All rights reserved.
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, Smile, Paperclip, CheckCheck, SmilePlus, Image as ImageIcon } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../utils/supabaseClient';
