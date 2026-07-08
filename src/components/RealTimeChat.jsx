@@ -12,6 +12,10 @@ export default function RealTimeChat({
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showAdminSettings, setShowAdminSettings] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedImagePreview, setSelectedImagePreview] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -76,75 +80,136 @@ export default function RealTimeChat({
     scrollToBottom();
   }, [activeChat?.messages, isTyping]);
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setSelectedFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setSelectedImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveSelectedImage = () => {
+    setSelectedFile(null);
+    setSelectedImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const uploadImageToSupabase = async (file) => {
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
+    const filePath = `public/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from('post-images')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('post-images')
+      .getPublicUrl(filePath);
+
+    return publicUrlData.publicUrl;
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!inputText.trim() && !selectedFile) return;
 
-    if (isSupabaseConfigured) {
-      try {
+    setUploadingImage(true);
+    let finalMessageText = inputText;
+
+    try {
+      if (selectedFile) {
+        if (isSupabaseConfigured) {
+          const imageUrl = await uploadImageToSupabase(selectedFile);
+          finalMessageText = `[Attachment](${imageUrl})${inputText ? ' ' + inputText : ''}`;
+        } else {
+          // Offline fallback
+          finalMessageText = `[Attachment](${selectedImagePreview})${inputText ? ' ' + inputText : ''}`;
+        }
+      }
+
+      if (isSupabaseConfigured) {
         const { error } = await supabase.from('chats').insert({
           sender_name: currentUser.name,
           sender_role: currentUser.role,
-          text: inputText
+          text: finalMessageText
         });
 
         if (error) throw error;
-        setInputText('');
-      } catch (err) {
-        console.error(err);
-        addNotification('Error', 'Failed to send message to database.', 'danger');
-      }
-    } else {
-      // Offline fallback simulation
-      const newMessage = {
-        id: `m_${Date.now()}`,
-        senderId: 'current',
-        text: inputText,
-        timestamp: new Date().toISOString(),
-        status: 'read'
-      };
-
-      const updatedChats = chats.map(chat => {
-        if (chat.id !== activeChatId) return chat;
-        return {
-          ...chat,
-          messages: [...chat.messages, newMessage]
-        };
-      });
-
-      setChats(updatedChats);
-      setInputText('');
-
-      // Trigger simulated reply from BDO/President
-      setIsTyping(true);
-      setTimeout(() => {
-        setIsTyping(false);
-        
-        let replyText = "Thank you for the message. I will review this immediately.";
-        if (activeChat.partnerRole === 'officer') {
-          replyText = `Understood. I am on the field right now coordinating the maintenance. I have received your update.`;
-        } else if (activeChat.partnerRole === 'admin') {
-          replyText = `Hello. Your note has been noted. We will address this in the upcoming Gram Sabha council briefing.`;
-        }
-
-        const botReply = {
-          id: `m_reply_${Date.now()}`,
-          senderId: activeChat.partnerId,
-          text: replyText,
+      } else {
+        // Offline fallback simulation
+        const newMessage = {
+          id: `m_${Date.now()}`,
+          senderId: 'current',
+          senderName: currentUser.name,
+          senderRole: currentUser.role,
+          text: finalMessageText,
           timestamp: new Date().toISOString(),
           status: 'read'
         };
 
-        setChats(prevChats => prevChats.map(chat => {
+        const updatedChats = chats.map(chat => {
           if (chat.id !== activeChatId) return chat;
           return {
             ...chat,
-            messages: [...chat.messages, botReply]
+            messages: [...chat.messages, newMessage]
           };
-        }));
+        });
 
-        addNotification('New Message', `Message from ${activeChat.partnerName}`, 'info');
-      }, 2500);
+        setChats(updatedChats);
+
+        // Trigger simulated reply from BDO/President
+        setIsTyping(true);
+        setTimeout(() => {
+          setIsTyping(false);
+          
+          let replyText = "Thank you for the message. I will review this immediately.";
+          if (activeChat.partnerRole === 'officer') {
+            replyText = `Understood. I am on the field right now coordinating the maintenance. I have received your update.`;
+          } else if (activeChat.partnerRole === 'admin') {
+            replyText = `Hello. Your note has been noted. We will address this in the upcoming Gram Sabha council briefing.`;
+          }
+
+          const botReply = {
+            id: `m_reply_${Date.now()}`,
+            senderId: activeChat.partnerId,
+            senderName: activeChat.partnerName,
+            senderRole: activeChat.partnerRole,
+            text: replyText,
+            timestamp: new Date().toISOString(),
+            status: 'read'
+          };
+
+          setChats(prevChats => prevChats.map(chat => {
+            if (chat.id !== activeChatId) return chat;
+            return {
+              ...chat,
+              messages: [...chat.messages, botReply]
+            };
+          }));
+
+          addNotification('New Message', `Message from ${activeChat.partnerName}`, 'info');
+        }, 2500);
+      }
+
+      setInputText('');
+      handleRemoveSelectedImage();
+    } catch (err) {
+      console.error(err);
+      addNotification('Error', 'Failed to send message.', 'danger');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -153,8 +218,7 @@ export default function RealTimeChat({
   };
 
   const handleAttachMedia = () => {
-    setInputText(prev => prev + ' 📸 [Attached Photo] ');
-    addNotification('File Attached', 'Mock image attached successfully.', 'info');
+    fileInputRef.current?.click();
   };
 
   const saveSettings = async (newSettings) => {
@@ -260,6 +324,39 @@ export default function RealTimeChat({
   const formatMessageTime = (isoString) => {
     const d = new Date(isoString);
     return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const renderMessageContent = (text) => {
+    if (text && text.includes('[Attachment](')) {
+      try {
+        const parts = text.split('[Attachment](');
+        const urlAndText = parts[1].split(')');
+        const imageUrl = urlAndText[0];
+        const captionText = urlAndText.slice(1).join(')');
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxWidth: '280px' }}>
+            <a href={imageUrl} target="_blank" rel="noopener noreferrer">
+              <img 
+                src={imageUrl} 
+                alt="Attachment" 
+                style={{ 
+                  maxWidth: '100%', 
+                  maxHeight: '200px', 
+                  borderRadius: '8px', 
+                  objectFit: 'cover',
+                  display: 'block' 
+                }} 
+              />
+            </a>
+            {captionText && <span style={{ display: 'block', fontSize: '0.9rem', marginTop: '2px' }}>{captionText}</span>}
+          </div>
+        );
+      } catch (e) {
+        return text;
+      }
+    }
+    return text;
   };
 
   let inputPlaceholder = "Post message in Village Square...";
@@ -475,7 +572,7 @@ export default function RealTimeChat({
                     fontSize: '0.9rem',
                     lineHeight: '1.4'
                   }}>
-                    {msg.text}
+                    {renderMessageContent(msg.text)}
                   </div>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '2px' }}>
                     {formatMessageTime(msg.timestamp)} {isMe && <CheckCheck size={10} style={{ color: 'var(--success)' }} />}
@@ -519,15 +616,68 @@ export default function RealTimeChat({
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Selected Image Preview (rendered above input bar) */}
+        {selectedImagePreview && (
+          <div style={{
+            padding: '8px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            borderTop: '1px solid var(--border)',
+            backgroundColor: 'var(--primary-light)',
+            animation: 'slideIn 0.2s ease'
+          }}>
+            <img 
+              src={selectedImagePreview} 
+              alt="Preview" 
+              style={{ 
+                width: '45px', 
+                height: '45px', 
+                objectFit: 'cover', 
+                borderRadius: '6px',
+                border: '1px solid var(--border)' 
+              }} 
+            />
+            <div style={{ flexGrow: 1 }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block' }}>Image attachment</span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Ready to send</span>
+            </div>
+            <button 
+              type="button" 
+              onClick={handleRemoveSelectedImage} 
+              style={{ 
+                background: 'none', 
+                border: 'none', 
+                color: 'var(--danger)', 
+                cursor: 'pointer',
+                fontSize: '1rem',
+                padding: '4px'
+              }}
+              title="Remove Image"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Input Bar */}
         <form onSubmit={handleSendMessage} style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {/* Hidden File Input */}
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            style={{ display: 'none' }} 
+            accept="image/*" 
+            onChange={handleFileChange}
+          />
+
           <button 
             type="button" 
             className="theme-toggle" 
             onClick={handleAttachMedia}
             style={{ padding: '6px' }}
-            title="Attach Mock Image"
-            disabled={!canChat}
+            title="Attach Photo"
+            disabled={!canChat || uploadingImage}
           >
             <Paperclip size={18} />
           </button>
@@ -535,10 +685,10 @@ export default function RealTimeChat({
           <input
             type="text"
             className="form-input"
-            placeholder={!canChat ? inputPlaceholder : (isSupabaseConfigured ? "Post message in Village Square..." : "Type your message here...")}
+            placeholder={uploadingImage ? "Uploading image..." : (!canChat ? inputPlaceholder : (isSupabaseConfigured ? "Post message in Village Square..." : "Type your message here..."))}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            disabled={!canChat}
+            disabled={!canChat || uploadingImage}
             dir="ltr"
             autoComplete="off"
             autoCorrect="off"
@@ -553,7 +703,7 @@ export default function RealTimeChat({
                 className="role-btn" 
                 onClick={() => handleAddEmoji(emoji)}
                 style={{ padding: '4px 6px', fontSize: '0.9rem' }}
-                disabled={!canChat}
+                disabled={!canChat || uploadingImage}
               >
                 {emoji}
               </button>
@@ -563,10 +713,14 @@ export default function RealTimeChat({
           <button 
             type="submit" 
             className="btn btn-primary"
-            style={{ padding: '8px 14px', borderRadius: '6px' }}
-            disabled={!canChat || !inputText.trim()}
+            style={{ padding: '8px 14px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '46px' }}
+            disabled={!canChat || uploadingImage || (!inputText.trim() && !selectedFile)}
           >
-            <Send size={16} />
+            {uploadingImage ? (
+              <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>...</span>
+            ) : (
+              <Send size={16} />
+            )}
           </button>
         </form>
 
