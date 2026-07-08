@@ -14,6 +14,7 @@ export default function LoginScreen({ onLoginSuccess, onGuestLogin, currentTheme
   const [occupation, setOccupation] = useState('');
   const [skills, setSkills] = useState('');
   const [volunteer, setVolunteer] = useState('');
+  const [registerRole, setRegisterRole] = useState('resident'); // 'resident' or 'officer'
   
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
@@ -25,8 +26,8 @@ export default function LoginScreen({ onLoginSuccess, onGuestLogin, currentTheme
     en: {
       title: 'Welcome to VillageConnect',
       subtitle: 'Digital Panchayat & Citizen Community Portal',
-      loginTab: 'Official Login',
-      registerTab: 'Officer Signup',
+      loginTab: 'Sign In',
+      registerTab: 'Create Account',
       guestTab: 'Resident (Guest)',
       email: 'Email Address',
       password: 'Password',
@@ -38,7 +39,7 @@ export default function LoginScreen({ onLoginSuccess, onGuestLogin, currentTheme
       skills: 'Skills (comma separated)',
       volunteer: 'Volunteer Interests (comma separated)',
       loginBtn: 'Log In',
-      registerBtn: 'Submit Signup Request',
+      registerBtn: 'Submit Registration',
       guestBtn: 'Enter as Resident',
       guestName: 'Your Name (displayed on posts)',
       guestPlaceholder: 'Enter your name...',
@@ -52,8 +53,8 @@ export default function LoginScreen({ onLoginSuccess, onGuestLogin, currentTheme
     ta: {
       title: 'வில்லேஜ்கனெக்ட்-க்கு வரவேற்கிறோம்',
       subtitle: 'டிஜிட்டல் பஞ்சாயத்து & குடிமக்கள் சமூக போர்டல்',
-      loginTab: 'அதிகாரப்பூர்வ உள்நுழைவு',
-      registerTab: 'அதிகாரி பதிவு',
+      loginTab: 'உள்நுழைவு',
+      registerTab: 'கணக்கை உருவாக்கு',
       guestTab: 'குடிமகன் (விருந்தினர்)',
       email: 'மின்னஞ்சல் முகவரி',
       password: 'கடவுச்சொல்',
@@ -65,14 +66,14 @@ export default function LoginScreen({ onLoginSuccess, onGuestLogin, currentTheme
       skills: 'திறன்கள் (காற்புள்ளியால் பிரிக்கப்பட்டது)',
       volunteer: 'தன்னார்வ ஆர்வங்கள் (காற்புள்ளியால் பிரிக்கப்பட்டது)',
       loginBtn: 'உள்நுழைக',
-      registerBtn: 'பதிவு கோரிக்கையை சமர்ப்பிக்கவும்',
+      registerBtn: 'பதிவை சமர்ப்பிக்கவும்',
       guestBtn: 'குடிமகனாக நுழையவும்',
       guestName: 'உங்கள் பெயர் (பதிவுகளில் காட்டப்படும்)',
       guestPlaceholder: 'உங்கள் பெயரை உள்ளிடவும்...',
       guestIntro: 'அறிவிப்புகளைப் பார்க்க, புகார்களைச் சமர்ப்பிக்க, நிகழ்வுகளைப் பார்க்க மற்றும் சந்தையில் இடுகையிட குடிமக்களுக்கு கணக்கு தேவையில்லை.',
       loading: 'செயலாக்கப்படுகிறது...',
       pendingTitle: 'பதிவு கோரிக்கை ஒப்புதலுக்காக காத்திருக்கிறது',
-      pendingText: 'பதிவு செய்ததற்கு நன்றி! உங்கள் அதிகாரி கணக்கு கோரிக்கை பஞ்சாயத்து நிர்வாகியிடம் சமர்ப்பிக்கப்பட்டுள்ளது. நிர்வாகி உங்கள் கோரிக்கையை பரிசீலித்து அனுமதித்தவுடன் நீங்கள் உள்நுழையலாம்.',
+      pendingText: 'பதிவு செய்ததற்கு நன்றி! உங்கள் அதிகாரி கணக்கு கோரிக்கை பஞ்சாயத்து நிர்வாகியிடம் சமர்ப்பிக்கப்பட்டுள்ளது. நிர்வாகி உங்கள் கோரிக்கையை பரிசீலித்து அனுமதித்தவுடன் நீங்கள் பதிவு கணக்கில் உள்நுழையலாம்.',
       goBack: 'மீண்டும் உள்நுழைவு பக்கம் செல்லவும்',
       noSupabase: 'குறிப்பு: தரவுத்தளம் லோக்கல் முறையில் இயங்குகிறது. நிகழ்நேர ஒத்திசைவு மற்றும் உண்மையான அங்கீகாரம் முடக்கப்பட்டுள்ளது. விருந்தினர் அணுகலைப் பயன்படுத்தலாம்.'
     }
@@ -155,7 +156,7 @@ export default function LoginScreen({ onLoginSuccess, onGuestLogin, currentTheme
         options: {
           data: {
             name,
-            role: 'officer',
+            role: registerRole,
             address,
             phone,
             blood_group: bloodGroupSelect === 'Other' ? customBloodGroup.trim() : bloodGroupSelect,
@@ -168,7 +169,11 @@ export default function LoginScreen({ onLoginSuccess, onGuestLogin, currentTheme
 
       if (error) throw error;
 
-      setMessage(t.pendingText);
+      if (registerRole === 'officer') {
+        setMessage(t.pendingText);
+      } else {
+        setMessage(lang === 'ta' ? 'பதிவு வெற்றிகரமாக முடிந்தது! உங்கள் மின்னஞ்சல் மற்றும் கடவுச்சொல்லுடன் உள்நுழையலாம்.' : 'Registration successful! You can now log in with your email and password.');
+      }
       setActiveTab('login');
       // Clear forms
       setEmail('');
@@ -299,6 +304,32 @@ export default function LoginScreen({ onLoginSuccess, onGuestLogin, currentTheme
         {activeTab === 'register' && (
           <form onSubmit={handleRegister} className="auth-form scrollable-form">
             <div className="form-grid">
+              <div className="form-group span-2" style={{ marginBottom: '4px' }}>
+                <label className="form-label" style={{ fontWeight: 600 }}>{lang === 'ta' ? 'பதிவு வகை' : 'Sign Up As'}</label>
+                <div style={{ display: 'flex', gap: '20px', marginTop: '6px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', color: 'var(--text-main)' }}>
+                    <input 
+                      type="radio" 
+                      name="registerRole" 
+                      value="resident" 
+                      checked={registerRole === 'resident'} 
+                      onChange={() => setRegisterRole('resident')} 
+                    />
+                    {lang === 'ta' ? 'குடிமகன் (உடனடி அணுகல்)' : 'Resident (Instant Access)'}
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', cursor: 'pointer', color: 'var(--text-main)' }}>
+                    <input 
+                      type="radio" 
+                      name="registerRole" 
+                      value="officer" 
+                      checked={registerRole === 'officer'} 
+                      onChange={() => setRegisterRole('officer')} 
+                    />
+                    {lang === 'ta' ? 'பஞ்சாயத்து அதிகாரி (அனுமதி தேவை)' : 'Panchayat Officer (Requires Approval)'}
+                  </label>
+                </div>
+              </div>
+
               <div className="form-group">
                 <label htmlFor="reg-name">{t.name} *</label>
                 <div className="input-with-icon">
