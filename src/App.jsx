@@ -651,7 +651,8 @@ export default function App() {
       pendingTitle: 'Request Pending Approval',
       pendingText: 'Your request to join as a Panchayat Officer is currently pending Admin clearance. You will receive notification as soon as the Admin reviews your application.',
       pendingSupport: 'Contact Admin: president.murugan@panchayat.gov.in',
-      loadingText: 'Synchronizing database...'
+      loadingText: 'Synchronizing database...',
+      copyright: '© 2026 Sanjai. All rights reserved.'
     },
     ta: {
       appName: 'கிராம இணைப்பு',
@@ -672,7 +673,8 @@ export default function App() {
       pendingTitle: 'கோரிக்கை நிலுவையில் உள்ளது',
       pendingText: 'பஞ்சாயத்து அதிகாரியாக சேருவதற்கான உங்கள் கோரிக்கை தற்போது நிர்வாகியின் ஒப்புதலுக்காக காத்திருக்கிறது. நிர்வாகி சரிபார்த்ததும் உங்களுக்கு அறிவிக்கப்படும்.',
       pendingSupport: 'நிர்வாகியைத் தொடர்பு கொள்ளவும்: president.murugan@panchayat.gov.in',
-      loadingText: 'தரவுத்தளம் ஒத்திசைக்கப்படுகிறது...'
+      loadingText: 'தரவுத்தளம் ஒத்திசைக்கப்படுகிறது...',
+      copyright: '© 2026 சஞ்சய். அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை.'
     }
   };
 
@@ -1054,6 +1056,17 @@ export default function App() {
         <main className="content-body">
           {renderActiveView()}
         </main>
+
+        <footer style={{
+          padding: '16px 24px',
+          borderTop: '1px solid var(--border)',
+          textAlign: 'center',
+          fontSize: '0.85rem',
+          color: 'var(--text-muted)',
+          marginTop: 'auto'
+        }}>
+          {t.copyright}
+        </footer>
       </div>
 
       {/* 3. Bottom Menu Bar Navigation (Mobile Views) */}

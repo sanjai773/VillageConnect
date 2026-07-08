@@ -50,7 +50,8 @@ export default function LoginScreen({ onLoginSuccess, onGuestLogin, currentTheme
       pendingTitle: 'Signup Request Pending Approval',
       pendingText: 'Thank you for registering! Your officer account request has been submitted to the Panchayat Admin. You will be able to log in once the Admin reviews and clears your request.',
       goBack: 'Back to Login',
-      noSupabase: 'Note: Database is running in local fallback mode. Real-time sync and real authentication are disabled. Feel free to use Guest Access or use the Role Switcher at the top to simulate views.'
+      noSupabase: 'Note: Database is running in local fallback mode. Real-time sync and real authentication are disabled. Feel free to use Guest Access or use the Role Switcher at the top to simulate views.',
+      copyright: '© 2026 Sanjai. All rights reserved.'
     },
     ta: {
       title: 'வில்லேஜ்கனெக்ட்-க்கு வரவேற்கிறோம்',
@@ -77,7 +78,8 @@ export default function LoginScreen({ onLoginSuccess, onGuestLogin, currentTheme
       pendingTitle: 'பதிவு கோரிக்கை ஒப்புதலுக்காக காத்திருக்கிறது',
       pendingText: 'பதிவு செய்ததற்கு நன்றி! உங்கள் அதிகாரி கணக்கு கோரிக்கை பஞ்சாயத்து நிர்வாகியிடம் சமர்ப்பிக்கப்பட்டுள்ளது. நிர்வாகி உங்கள் கோரிக்கையை பரிசீலித்து அனுமதித்தவுடன் நீங்கள் பதிவு கணக்கில் உள்நுழையலாம்.',
       goBack: 'மீண்டும் உள்நுழைவு பக்கம் செல்லவும்',
-      noSupabase: 'குறிப்பு: தரவுத்தளம் லோக்கல் முறையில் இயங்குகிறது. நிகழ்நேர ஒத்திசைவு மற்றும் உண்மையான அங்கீகாரம் முடக்கப்பட்டுள்ளது. விருந்தினர் அணுகலைப் பயன்படுத்தலாம்.'
+      noSupabase: 'குறிப்பு: தரவுத்தளம் லோக்கல் முறையில் இயங்குகிறது. நிகழ்நேர ஒத்திசைவு மற்றும் உண்மையான அங்கீகாரம் முடக்கப்பட்டுள்ளது. விருந்தினர் அணுகலைப் பயன்படுத்தலாம்.',
+      copyright: '© 2026 சஞ்சய். அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை.'
     }
   }[lang || 'en'];
 
@@ -461,6 +463,17 @@ export default function LoginScreen({ onLoginSuccess, onGuestLogin, currentTheme
             </button>
           </form>
         )}
+
+        <div style={{
+          marginTop: '24px',
+          paddingTop: '16px',
+          borderTop: '1px solid var(--border)',
+          textAlign: 'center',
+          fontSize: '0.8rem',
+          color: 'var(--text-muted)'
+        }}>
+          {t.copyright}
+        </div>
       </div>
 
       <style dangerouslySetInnerHTML={{__html: `
