@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Heart, ThumbsUp, HelpCircle, MessageSquare, Send, Flag, Pin, AlertTriangle, Image as ImageIcon, X } from 'lucide-react';
+import { Heart, ThumbsUp, HelpCircle, MessageSquare, Send, Share2, Flag, Pin, AlertTriangle, Image as ImageIcon, X } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../utils/supabaseClient';
 
 export default function FeedView({ 
@@ -15,6 +15,7 @@ export default function FeedView({
   const [imagePreview, setImagePreview] = useState(null);
   const [commentInputs, setCommentInputs] = useState({});
   const [uploading, setUploading] = useState(false);
+  const [activeSharePostId, setActiveSharePostId] = useState(null);
 
   // Custom Camera Modal state
   const [showCameraModal, setShowCameraModal] = useState(false);
@@ -278,6 +279,10 @@ export default function FeedView({
     }
   };
 
+  const handleShareClick = (postId) => {
+    setActiveSharePostId(prev => prev === postId ? null : postId);
+  };
+
   const formatTime = (isoString) => {
     const date = new Date(isoString);
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -503,40 +508,147 @@ export default function FeedView({
             <p style={{ fontSize: '0.95rem', marginBottom: '12px', whiteSpace: 'pre-wrap' }}>{post.content}</p>
             
             {post.image && (
-              <div style={{ borderRadius: '8px', overflow: 'hidden', marginBottom: '12px', maxHeight: '350px' }}>
-                <img src={post.image} alt="Post Attachment" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div style={{ 
+                borderRadius: '8px', 
+                overflow: 'hidden', 
+                marginBottom: '12px', 
+                maxHeight: '450px', 
+                display: 'flex', 
+                justifyContent: 'center', 
+                backgroundColor: 'rgba(0,0,0,0.03)' 
+              }}>
+                <img 
+                  src={post.image} 
+                  alt="Post Attachment" 
+                  style={{ 
+                    maxWidth: '100%', 
+                    maxHeight: '450px', 
+                    height: 'auto', 
+                    objectFit: 'contain',
+                    display: 'block'
+                  }} 
+                />
               </div>
             )}
 
             {/* Action Bar */}
-            <div style={{ display: 'flex', gap: '12px', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '8px 0', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', padding: '8px 0', marginBottom: '12px', position: 'relative' }}>
               <button 
                 className={`btn btn-outline ${post.hasReacted === 'like' ? 'active' : ''}`}
                 onClick={() => handleReact(post.id, 'like')}
-                style={{ flexGrow: 1, border: 'none', padding: '6px', borderRadius: '4px', fontSize: '0.85rem' }}
+                style={{ flexGrow: 1, border: 'none', padding: '6px', borderRadius: '4px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
-                <ThumbsUp size={16} /> Like ({post.reactions?.like || 0})
+                <Heart size={16} style={{ fill: post.hasReacted === 'like' ? 'var(--danger)' : 'none', color: post.hasReacted === 'like' ? 'var(--danger)' : 'currentColor' }} /> Like ({post.reactions?.like || 0})
               </button>
               <button 
-                className={`btn btn-outline ${post.hasReacted === 'love' ? 'active' : ''}`}
-                onClick={() => handleReact(post.id, 'love')}
-                style={{ flexGrow: 1, border: 'none', padding: '6px', borderRadius: '4px', fontSize: '0.85rem' }}
+                className="btn btn-outline"
+                onClick={() => {
+                  const inputEl = document.getElementById(`comment-input-${post.id}`);
+                  inputEl?.focus();
+                }}
+                style={{ flexGrow: 1, border: 'none', padding: '6px', borderRadius: '4px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
-                <Heart size={16} style={{ fill: post.hasReacted === 'love' ? 'var(--danger)' : 'none', color: post.hasReacted === 'love' ? 'var(--danger)' : 'currentColor' }} /> Love ({post.reactions?.love || 0})
+                <MessageSquare size={16} /> Comment ({post.comments?.length || 0})
               </button>
               <button 
-                className={`btn btn-outline ${post.hasReacted === 'support' ? 'active' : ''}`}
-                onClick={() => handleReact(post.id, 'support')}
-                style={{ flexGrow: 1, border: 'none', padding: '6px', borderRadius: '4px', fontSize: '0.85rem' }}
+                className="btn btn-outline"
+                onClick={() => handleShareClick(post.id)}
+                style={{ flexGrow: 1, border: 'none', padding: '6px', borderRadius: '4px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
               >
-                <HelpCircle size={16} /> Support ({post.reactions?.support || 0})
+                <Share2 size={16} /> Share
               </button>
+
+              {/* Share Dropdown */}
+              {activeSharePostId === post.id && (
+                <div style={{
+                  position: 'absolute',
+                  bottom: '100%',
+                  right: '10px',
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)',
+                  boxShadow: 'var(--shadow-md)',
+                  zIndex: 50,
+                  padding: '6px 0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minWidth: '160px',
+                  marginBottom: '4px'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const shareText = encodeURIComponent(`${post.content.substring(0, 100)}...\n\nRead more on VillageConnect: ${window.location.origin}`);
+                      window.open(`https://api.whatsapp.com/send?text=${shareText}`, '_blank');
+                      setActiveSharePostId(null);
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'none',
+                      border: 'none',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-main)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    🟢 WhatsApp
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.origin);
+                      addNotification('Link Copied', 'Paste this link to share on Instagram!', 'success');
+                      setActiveSharePostId(null);
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'none',
+                      border: 'none',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-main)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    📸 Instagram
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.origin);
+                      addNotification('Link Copied', 'Copied to clipboard!', 'success');
+                      setActiveSharePostId(null);
+                    }}
+                    style={{
+                      padding: '8px 16px',
+                      background: 'none',
+                      border: 'none',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      color: 'var(--text-main)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    🔗 Copy Link
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Comments Thread */}
             <div className="comments-section" style={{ backgroundColor: 'var(--primary-light)', padding: '12px', borderRadius: '8px' }}>
               <h5 style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <MessageSquare size={12} /> Discussion ({post.comments?.length || 0})
+                <MessageSquare size={12} /> Comments ({post.comments?.length || 0})
               </h5>
               
               {post.comments?.length > 0 && (
@@ -559,6 +671,7 @@ export default function FeedView({
               {/* Add Comment Input */}
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input
+                  id={`comment-input-${post.id}`}
                   type="text"
                   className="form-input"
                   placeholder="Write a comment..."

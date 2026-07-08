@@ -139,7 +139,7 @@ export default function RealTimeChat({
     <div className="chat-layout card" style={{ display: 'flex', height: '550px', padding: 0, overflow: 'hidden' }}>
       
       {/* Chats Sidebar */}
-      <div style={{ width: '220px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--primary-light)' }}>
+      <div className="chat-sidebar">
         <div style={{ padding: '16px', borderBottom: '1px solid var(--border)', fontWeight: 600, fontSize: '0.9rem' }}>
           {isSupabaseConfigured ? 'Channels' : 'Conversations'}
         </div>
@@ -182,7 +182,7 @@ export default function RealTimeChat({
       </div>
 
       {/* Messages Pane */}
-      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-card)' }}>
+      <div className="chat-pane">
         
         {/* Chat Partner Header */}
         <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -269,10 +269,13 @@ export default function RealTimeChat({
             placeholder={isSupabaseConfigured ? "Post message in Village Square..." : "Type your message here..."}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
+            dir="ltr"
+            autoComplete="off"
+            autoCorrect="off"
             style={{ flexGrow: 1, fontSize: '0.9rem' }}
           />
 
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div className="chat-emoji-shortcuts">
             {['👍', '🙏', '❤️'].map(emoji => (
               <button 
                 key={emoji}

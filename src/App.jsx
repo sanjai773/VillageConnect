@@ -322,7 +322,10 @@ export default function App() {
       .channel('announcement_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setAnnouncements(prev => [payload.new, ...prev]);
+          setAnnouncements(prev => {
+            if (prev.some(a => a.id === payload.new.id)) return prev;
+            return [payload.new, ...prev];
+          });
           addNotification('New Announcement', payload.new.title, 'info');
         } else if (payload.eventType === 'UPDATE') {
           setAnnouncements(prev => prev.map(a => a.id === payload.new.id ? payload.new : a));
@@ -337,7 +340,10 @@ export default function App() {
       .channel('post_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setPosts(prev => [{ ...payload.new, comments: [] }, ...prev]);
+          setPosts(prev => {
+            if (prev.some(p => p.id === payload.new.id)) return prev;
+            return [{ ...payload.new, comments: [] }, ...prev];
+          });
         } else if (payload.eventType === 'UPDATE') {
           setPosts(prev => prev.map(p => p.id === payload.new.id ? { ...p, ...payload.new } : p));
         } else if (payload.eventType === 'DELETE') {
@@ -373,7 +379,10 @@ export default function App() {
       .channel('complaint_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'complaints' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setComplaints(prev => [payload.new, ...prev]);
+          setComplaints(prev => {
+            if (prev.some(c => c.id === payload.new.id)) return prev;
+            return [payload.new, ...prev];
+          });
           addNotification('New Complaint Lodged', payload.new.title, 'warning');
         } else if (payload.eventType === 'UPDATE') {
           setComplaints(prev => prev.map(c => c.id === payload.new.id ? payload.new : c));
@@ -388,7 +397,10 @@ export default function App() {
       .channel('event_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setEvents(prev => [payload.new, ...prev]);
+          setEvents(prev => {
+            if (prev.some(e => e.id === payload.new.id)) return prev;
+            return [payload.new, ...prev];
+          });
           addNotification('New Community Event', payload.new.title, 'info');
         } else if (payload.eventType === 'UPDATE') {
           setEvents(prev => prev.map(e => e.id === payload.new.id ? payload.new : e));
@@ -403,7 +415,10 @@ export default function App() {
       .channel('market_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'marketplace' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setMarketplaceItems(prev => [payload.new, ...prev]);
+          setMarketplaceItems(prev => {
+            if (prev.some(m => m.id === payload.new.id)) return prev;
+            return [payload.new, ...prev];
+          });
           addNotification('Marketplace Update', `New listing: ${payload.new.title}`, 'success');
         } else if (payload.eventType === 'UPDATE') {
           setMarketplaceItems(prev => prev.map(m => m.id === payload.new.id ? payload.new : m));
@@ -430,7 +445,10 @@ export default function App() {
       .channel('profile_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setUsers(prev => [...prev, payload.new]);
+          setUsers(prev => {
+            if (prev.some(u => u.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+          });
         } else if (payload.eventType === 'UPDATE') {
           setUsers(prev => prev.map(u => u.id === payload.new.id ? payload.new : u));
           // If current logged-in profile was updated, sync sessionUser
@@ -865,44 +883,66 @@ export default function App() {
         {/* Top Role Selector and Styling bar */}
         <header className="role-bar">
           <div className="role-title">
-            <span>{t.subtitle}</span>
+            <span className="desktop-title">{t.subtitle}</span>
+            <span className="mobile-title">🌾 {t.appName.split(' ')[0]}</span>
           </div>
 
           <div className="role-selectors">
             {/* Show Role Switcher only when offline */}
             {!isSupabaseConfigured ? (
               <>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500, marginRight: '4px' }}>
-                  {t.roleSelectLabel}
-                </span>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <button 
-                    className={`role-btn ${currentUserId === 'u1' ? 'active' : ''}`}
-                    onClick={() => {
-                      setCurrentUserId('u1');
-                      addNotification('Role Switched', 'Acting as Rajesh (Resident)', 'info');
+                {/* Desktop Buttons switcher */}
+                <div className="role-switcher-desktop">
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500, marginRight: '4px' }}>
+                    {t.roleSelectLabel}
+                  </span>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <button 
+                      className={`role-btn ${currentUserId === 'u1' ? 'active' : ''}`}
+                      onClick={() => {
+                        setCurrentUserId('u1');
+                        addNotification('Role Switched', 'Acting as Rajesh (Resident)', 'info');
+                      }}
+                    >
+                      Resident (Rajesh)
+                    </button>
+                    <button 
+                      className={`role-btn ${currentUserId === 'u5' ? 'active' : ''}`}
+                      onClick={() => {
+                        setCurrentUserId('u5');
+                        addNotification('Role Switched', 'Acting as Officer Subhash', 'info');
+                      }}
+                    >
+                      Officer (Subhash)
+                    </button>
+                    <button 
+                      className={`role-btn ${currentUserId === 'u6' ? 'active' : ''}`}
+                      onClick={() => {
+                        setCurrentUserId('u6');
+                        addNotification('Role Switched', 'Acting as Panchayat President Murugan', 'info');
+                      }}
+                    >
+                      Admin (Murugan)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mobile Dropdown switcher */}
+                <div className="role-switcher-mobile">
+                  <select 
+                    value={currentUserId} 
+                    onChange={(e) => {
+                      const uid = e.target.value;
+                      setCurrentUserId(uid);
+                      const selectedPersona = users.find(u => u.id === uid) || { name: uid === 'u1' ? 'Rajesh' : uid === 'u5' ? 'Subhash' : 'Murugan' };
+                      addNotification('Role Switched', `Acting as ${selectedPersona.name}`, 'info');
                     }}
+                    className="role-select-dropdown"
                   >
-                    Resident (Rajesh)
-                  </button>
-                  <button 
-                    className={`role-btn ${currentUserId === 'u5' ? 'active' : ''}`}
-                    onClick={() => {
-                      setCurrentUserId('u5');
-                      addNotification('Role Switched', 'Acting as Officer Subhash', 'info');
-                    }}
-                  >
-                    Officer (Subhash)
-                  </button>
-                  <button 
-                    className={`role-btn ${currentUserId === 'u6' ? 'active' : ''}`}
-                    onClick={() => {
-                      setCurrentUserId('u6');
-                      addNotification('Role Switched', 'Acting as Panchayat President Murugan', 'info');
-                    }}
-                  >
-                    Admin (Murugan)
-                  </button>
+                    <option value="u1">👤 Resident</option>
+                    <option value="u5">💼 Officer</option>
+                    <option value="u6">🏛️ Admin</option>
+                  </select>
                 </div>
               </>
             ) : (
@@ -934,6 +974,30 @@ export default function App() {
             >
               {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
+
+            {/* Mobile User Profile Section */}
+            <div className="mobile-user-profile">
+              <div 
+                className="user-avatar" 
+                onClick={() => setShowProfileModal(true)} 
+                style={{ cursor: 'pointer', width: '32px', height: '32px', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                title={lang === 'en' ? 'Edit Profile' : 'சுயவிவரத்தைத் திருத்து'}
+              >
+                {currentUser.role === 'admin' ? '🏛️' : currentUser.role === 'officer' ? '💼' : '👤'}
+              </div>
+              <div className="mobile-user-info-text">
+                <span className="mobile-username">{currentUser.name.split(' ')[0]}</span>
+              </div>
+              {sessionUser && (
+                <button 
+                  onClick={handleLogout}
+                  className="mobile-logout-btn"
+                  title="Logout"
+                >
+                  <LogOut size={16} />
+                </button>
+              )}
+            </div>
           </div>
         </header>
 

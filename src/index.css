@@ -67,12 +67,14 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
 }
 
 /* App Container Layout */
 .app-container {
   display: flex;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 /* Top Role Switcher Bar */
@@ -166,8 +168,11 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  position: sticky;
+  position: fixed;
+  left: 0;
   top: 0;
+  bottom: 0;
+  z-index: 100;
   flex-shrink: 0;
 }
 
@@ -258,6 +263,7 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  margin-left: 260px;
 }
 
 .content-body {
@@ -503,6 +509,73 @@ body {
   color: var(--accent);
 }
 
+/* Role Switcher Responsiveness */
+.role-switcher-desktop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.role-switcher-mobile {
+  display: none;
+}
+
+.role-select-dropdown {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+}
+
+.dark-theme .role-select-dropdown {
+  background-color: var(--bg-sidebar);
+  color: var(--text-white);
+  border-color: var(--border);
+}
+
+/* Titles responsive styles */
+.mobile-title {
+  display: none;
+}
+
+.desktop-title {
+  display: inline;
+}
+
+/* Mobile User Profile Section */
+.mobile-user-profile {
+  display: none;
+}
+
+/* Chat Layout Classes */
+.chat-sidebar {
+  width: 220px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--primary-light);
+  flex-shrink: 0;
+}
+
+.chat-pane {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-card);
+  min-width: 0;
+}
+
+.chat-emoji-shortcuts {
+  display: flex;
+  gap: 4px;
+}
+
 @media (max-width: 768px) {
   .sidebar {
     display: none;
@@ -519,5 +592,88 @@ body {
   
   .app-container {
     flex-direction: column;
+  }
+  
+  .role-switcher-desktop {
+    display: none;
+  }
+  .role-switcher-mobile {
+    display: block;
+  }
+  
+  .desktop-title {
+    display: none;
+  }
+  .mobile-title {
+    display: inline;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--primary);
+  }
+  .dark-theme .mobile-title {
+    color: var(--text-white);
+  }
+
+  .mobile-user-profile {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 10px;
+    border-left: 1px solid var(--border);
+    margin-left: 10px;
+  }
+  .mobile-user-info-text {
+    display: flex;
+    flex-direction: column;
+  }
+  .mobile-username {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-main);
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dark-theme .mobile-username {
+    color: var(--text-white);
+  }
+  .mobile-logout-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 50%;
+    transition: var(--transition);
+  }
+  .mobile-logout-btn:hover {
+    background-color: var(--danger-light);
+  }
+  
+  .role-bar {
+    padding: 8px 12px;
+  }
+  
+  /* Safe body/layout reset to prevent horizontal overflow */
+  .app-container, .main-layout {
+    overflow-x: hidden;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .main-layout {
+    margin-left: 0;
+  }
+
+  .chat-sidebar {
+    display: none;
+  }
+
+  .chat-emoji-shortcuts {
+    display: none !important;
   }
 }

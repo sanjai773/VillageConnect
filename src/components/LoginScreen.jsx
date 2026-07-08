@@ -660,6 +660,35 @@ export default function LoginScreen({ onLoginSuccess, onGuestLogin, currentTheme
           50% { transform: scale(1.05); }
           100% { transform: scale(1); }
         }
+        @media (max-width: 480px) {
+          .login-card {
+            padding: 20px;
+          }
+          .login-tabs {
+            flex-direction: column;
+            gap: 6px;
+            border-bottom: none;
+            margin-bottom: 16px;
+          }
+          .login-tab-btn {
+            border-bottom: none;
+            border-radius: var(--radius-sm);
+            background-color: var(--primary-light);
+            padding: 10px;
+            font-size: 0.85rem;
+          }
+          .login-tab-btn.active {
+            background-color: var(--primary);
+            color: var(--text-white);
+          }
+          .form-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+          .span-2 {
+            grid-column: span 1;
+          }
+        }
       `}} />
     </div>
   );
