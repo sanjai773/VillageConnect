@@ -18,6 +18,74 @@ export default function AdminDashboard({
   const isOfficer = currentUser?.role === 'officer';
   const defaultTab = !isOfficer && isSupabaseConfigured ? 'requests' : 'moderation';
   const [activeTab, setActiveTab] = useState(defaultTab);
+
+  // Custom directory entries (to review profile edit requests)
+  const [directoryEntries, setDirectoryEntries] = useState([]);
+
+  useEffect(() => {
+    const fetchEntries = async () => {
+      if (isSupabaseConfigured) {
+        try {
+          const { data, error } = await supabase
+            .from('village_directory')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (data) setDirectoryEntries(data);
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        const saved = localStorage.getItem('vc_custom_directory');
+        if (saved) {
+          try {
+            setDirectoryEntries(JSON.parse(saved));
+          } catch (e) {}
+        }
+      }
+    };
+    fetchEntries();
+
+    if (isSupabaseConfigured) {
+      const sub = supabase
+        .channel('admin_dashboard_directory')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'village_directory' }, (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setDirectoryEntries(prev => {
+              if (prev.some(e => e.id === payload.new.id)) return prev;
+              return [payload.new, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            setDirectoryEntries(prev => prev.map(e => e.id === payload.new.id ? payload.new : e));
+          } else if (payload.eventType === 'DELETE') {
+            setDirectoryEntries(prev => prev.filter(e => e.id !== payload.old.id));
+          }
+        })
+        .subscribe();
+      return () => {
+        supabase.removeChannel(sub);
+      };
+    }
+  }, []);
+
+  const handleAdminPermissionResponse = async (entry, status) => {
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase
+          .from('village_directory')
+          .update({ edit_permission: status })
+          .eq('id', entry.id);
+        if (error) throw error;
+        addNotification('Request Processed', `Permission ${status === 'granted' ? 'granted' : 'declined'} successfully.`, 'success');
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      const updated = directoryEntries.map(e => e.id === entry.id ? { ...e, edit_permission: status } : e);
+      setDirectoryEntries(updated);
+      localStorage.setItem('vc_custom_directory', JSON.stringify(updated));
+      addNotification('Request Processed', `Permission status updated locally.`, 'success');
+    }
+  };
   
   // Settings values
   const [waterSla, setWaterSla] = useState(24);
@@ -422,9 +490,12 @@ export default function AdminDashboard({
   }, {});
 
   // Tabs layout builder
+  const pendingEditsCount = directoryEntries.filter(e => e.edit_permission === 'requested').length;
+  const totalRequestsCount = pendingOfficers.length + pendingEditsCount;
+
   const tabs = [
     { id: 'moderation', label: 'Moderation Queue', icon: <AlertTriangle size={16} /> },
-    ...(!isOfficer && isSupabaseConfigured ? [{ id: 'requests', label: `Officer Requests (${pendingOfficers.length})`, icon: <ShieldCheck size={16} /> }] : []),
+    ...(!isOfficer && isSupabaseConfigured ? [{ id: 'requests', label: `Approval Requests (${totalRequestsCount})`, icon: <ShieldCheck size={16} /> }] : []),
     { id: 'announcements', label: 'Announcements Manager', icon: <Pin size={16} /> },
     { id: 'users', label: 'Resident Directory', icon: <Users size={16} /> },
     { id: 'analytics', label: 'Civic Analytics', icon: <BarChart2 size={16} /> },
@@ -473,55 +544,113 @@ export default function AdminDashboard({
         ))}
       </div>
 
-      {/* Tab: Officer Requests (Live DB only) */}
+      {/* Tab: Approval Requests (Live DB only) */}
       {activeTab === 'requests' && isSupabaseConfigured && !isOfficer && (
-        <div style={{ animation: 'slideIn 0.2s ease' }}>
-          {pendingOfficers.length === 0 ? (
-            <div className="card" style={{ textAlign: 'center', padding: '40px' }}>
-              <Check size={40} style={{ color: 'var(--success)', marginBottom: '12px' }} />
-              <h4 style={{ fontWeight: 600 }}>No Pending Requests</h4>
-              <p style={{ color: 'var(--text-muted)' }}>All registration requests from Panchayat Officers have been processed.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {pendingOfficers.map(officer => (
-                <div key={officer.id} className="card" style={{ borderLeft: '5px solid var(--accent)', padding: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
-                    <div>
-                      <h4 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--primary)' }}>{officer.name}</h4>
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Email: {officer.email} | Phone: {officer.phone || 'N/A'}</p>
+        <div style={{ animation: 'slideIn 0.2s ease', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          
+          {/* Section 1: Officer Sign-up Requests */}
+          <div>
+            <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              👤 Officer Signup Requests ({pendingOfficers.length})
+            </h3>
+            {pendingOfficers.length === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: '24px' }}>
+                <Check size={32} style={{ color: 'var(--success)', marginBottom: '8px', display: 'inline-block' }} />
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No pending officer signup requests.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {pendingOfficers.map(officer => (
+                  <div key={officer.id} className="card" style={{ borderLeft: '5px solid var(--accent)', padding: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+                      <div>
+                        <h4 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--primary)' }}>{officer.name}</h4>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Email: {officer.email} | Phone: {officer.phone || 'N/A'}</p>
+                      </div>
+                      <span className="badge urgent" style={{ fontSize: '0.7rem' }}>Pending Approval</span>
                     </div>
-                    <span className="badge urgent" style={{ fontSize: '0.7rem' }}>Pending Approval</span>
-                  </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.85rem', backgroundColor: 'var(--primary-light)', padding: '12px', borderRadius: 'var(--radius-sm)', marginBottom: '16px' }}>
-                    <p><strong>Address:</strong> {officer.address || 'N/A'}</p>
-                    <p><strong>Occupation:</strong> {officer.occupation || 'N/A'}</p>
-                    <p><strong>Blood Group:</strong> {officer.blood_group || 'N/A'}</p>
-                    <p><strong>Skills:</strong> {officer.skills ? officer.skills.join(', ') : 'None'}</p>
-                    <p className="span-2"><strong>Volunteer Interests:</strong> {officer.volunteer ? officer.volunteer.join(', ') : 'None'}</p>
-                  </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.85rem', backgroundColor: 'var(--primary-light)', padding: '12px', borderRadius: 'var(--radius-sm)', marginBottom: '16px' }}>
+                      <p><strong>Address:</strong> {officer.address || 'N/A'}</p>
+                      <p><strong>Occupation:</strong> {officer.occupation || 'N/A'}</p>
+                      <p><strong>Blood Group:</strong> {officer.blood_group || 'N/A'}</p>
+                      <p><strong>Skills:</strong> {officer.skills ? officer.skills.join(', ') : 'None'}</p>
+                      <p className="span-2"><strong>Volunteer Interests:</strong> {officer.volunteer ? officer.volunteer.join(', ') : 'None'}</p>
+                    </div>
 
-                  <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                    <button 
-                      className="btn btn-outline" 
-                      onClick={() => handleOfficerApproval(officer.id, 'reject')}
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '8px 16px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
-                    >
-                      <UserX size={14} /> Reject Request
-                    </button>
-                    <button 
-                      className="btn btn-primary" 
-                      onClick={() => handleOfficerApproval(officer.id, 'approve')}
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '8px 16px' }}
-                    >
-                      <UserCheck size={14} /> Approve & Clear
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      <button 
+                        className="btn btn-outline" 
+                        onClick={() => handleOfficerApproval(officer.id, 'reject')}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '8px 16px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                      >
+                        <UserX size={14} /> Reject Request
+                      </button>
+                      <button 
+                        className="btn btn-primary" 
+                        onClick={() => handleOfficerApproval(officer.id, 'approve')}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '8px 16px' }}
+                      >
+                        <UserCheck size={14} /> Approve & Clear
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Section 2: Directory Profile Edit Requests */}
+          <div>
+            <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.1rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              📝 Directory Profile Edit Requests ({pendingEditsCount})
+            </h3>
+            {pendingEditsCount === 0 ? (
+              <div className="card" style={{ textAlign: 'center', padding: '24px' }}>
+                <Check size={32} style={{ color: 'var(--success)', marginBottom: '8px', display: 'inline-block' }} />
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No pending directory edit requests.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {directoryEntries.filter(e => e.edit_permission === 'requested').map(entry => (
+                  <div key={entry.id} className="card" style={{ borderLeft: '5px solid var(--primary)', padding: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+                      <div>
+                        <h4 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--primary)' }}>{entry.name}</h4>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Phone: {entry.phone || 'N/A'} | Occupation: {entry.occupation || 'Resident'}</p>
+                      </div>
+                      <span className="badge urgent" style={{ fontSize: '0.7rem', backgroundColor: 'var(--primary-light)', color: 'var(--primary)' }}>Wants to Edit</span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.85rem', backgroundColor: 'var(--primary-light)', padding: '12px', borderRadius: 'var(--radius-sm)', marginBottom: '16px' }}>
+                      <p><strong>Address:</strong> {entry.address || 'N/A'}</p>
+                      <p><strong>Blood Group:</strong> {entry.blood_group || 'N/A'}</p>
+                      <p><strong>Skills:</strong> {entry.skills ? entry.skills.join(', ') : 'None'}</p>
+                      <p className="span-2"><strong>Volunteer Interests:</strong> {entry.volunteer ? entry.volunteer.join(', ') : 'None'}</p>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      <button 
+                        className="btn btn-outline" 
+                        onClick={() => handleAdminPermissionResponse(entry, 'idle')}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '8px 16px', color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                      >
+                        Reject & Lock
+                      </button>
+                      <button 
+                        className="btn btn-primary" 
+                        onClick={() => handleAdminPermissionResponse(entry, 'granted')}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', padding: '8px 16px' }}
+                      >
+                        Grant Edit Rights
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 
